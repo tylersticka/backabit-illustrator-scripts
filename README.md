@@ -6,4 +6,4 @@ http://backabit.com
 
 ## Backabit Export
 
-!(Backabit Export Screenshot)[https://raw.githubusercontent.com/tylersticka/backabit-illustrator-scripts/master/screenshots/Backabit%20Export.png]
+![Backabit Export Screenshot](https://raw.githubusercontent.com/tylersticka/backabit-illustrator-scripts/master/screenshots/Backabit%20Export.png)
