@@ -1,127 +1,192 @@
 ﻿/**
- * Helper for exporting Backabit game assets
+ * Backabit Export Script for Illustrator CC 2015
+ *
+ * Displays a dialog allowing you to export assets for the current document
+ * with some different settings, including initial scale, export scales,
+ * artboards and filename prefix.
+ *
+ * Created to eliminate some busy work while designing games! :)
+ *
+ * http://backabit.com
  */
 
-var document = app.activeDocument;
+var doc = app.activeDocument;
 
-var designedAt = 2;
-var resolutions = [ 1, 2, 3, 4, 5, 6, 7, 8 ];
+var settings = {
+  sourceScale: 2,
+  exportScales: '2,3',
+  artboards: (doc && doc.artboards.length > 1) ? '1-' + doc.artboards.length : 1,
+  filePrefix: doc ? doc.name.replace(/.ai$/, '_') : '',
+  folder: doc ? doc.path : ''
+};
 
-var checkboxes = [];
-var artboardRange = '1';
+/**
+ * Expand a string representing a numerical range into an array of numbers.
+ *
+ *     expandRange('-6,-3--1,3-5,7-11,14,15,17-20')
+ *     //=> [-6,-3,-2,-1,3,4,5,7,8,9,10,11,14,15,17,18,19,20]
+ *
+ * See: http://www.rosettacode.org/wiki/Range_expansion#JavaScript
+ */
 
-function rangeToArray (range) {
-    var result = [];
-    var segments, segment, parsed, index;
-    var dashAt, dashSegments, dashEnd, dashIndex;
-    
-    range = range || '';
-    range.replace(/ /g,'');
-    segments = range.split(',');
-    
-    for (i = 0; i < segments.length; i++) {
-        segment = segments[i];
-        dashAt = segment.indexOf('-');
-        
-        if (dashAt === -1) {
-            parsed = parseInt(segment, 10);
-            
-            if (!isNaN(parsed)) {
-                result.push(parsed);
-            }
-        } else {
-            dashSegments = segment.split('-');
-            dashIndex = parseInt(dashSegments[0], 10);
-            dashEnd = parseInt(dashSegments[1], 10);
-            
-            if (!isNaN(dashIndex) && !isNaN(dashEnd)) {
-                for (; dashIndex <= dashEnd; dashIndex++) {
-                    result.push(dashIndex);
-                }
-            }
-        }
-    }
-
-    return result;
+function expandRange (rangeExpr) {
+  var result = [];
+  var terms = rangeExpr.split(/,/);
+  var key;
+  
+  for (key in terms) {
+    result = result.concat(expandRange.expandTerm(terms[key]));
+  }
+  
+  return result;
 }
 
-if (document) {
-    var baseName = document.name.replace(/.ai$/, '');
-    var folder = document.path;
+expandRange.getFactors = function (term) {
+  var matches = term.match(/(-?[0-9]+)-(-?[0-9]+)/);
+  var result = [];
+  
+  if (matches) {
+    result.push(Number(matches[1]));
+    result.push(Number(matches[2]));
+  } else {
+    result.push(Number(term));
+  }
+  
+  return result;
+};
 
-    if (document.artboards.length > 1) {
-        artboardRange += '-' + document.artboards.length;
+expandRange.expandTerm = function (term) {
+  var factors = expandRange.getFactors(term);
+  var range = [];
+  var n;
+  
+  if (factors.length < 2) {
+    range.push(factors[0]);
+  } else {
+    for (n = factors[0]; n <= factors[factors.length - 1]; n++) {
+      range.push(n);
+    }
+  }
+  
+  return range;
+};
+
+/**
+ * Export
+ */
+
+function startExport () {
+  var sourceScale = Number(settings.sourceScale);
+  var exportScales = expandRange(settings.exportScales);
+  var artboards = expandRange(settings.artboards);
+  var i;
+  
+  for (i = 0; i < artboards.length; i++) {
+    exportArtboard(
+      artboards[i] - 1,
+      sourceScale,
+      exportScales,
+      settings.folder,
+      settings.filePrefix);
+  }
+}
+
+function exportArtboard (artboardIndex, sourceScale, scales, folder, prefix) {
+  var artboard, scale, pathBase, path, file, options, i;
+  
+  doc.artboards.setActiveArtboardIndex(artboardIndex);
+  artboard = doc.artboards[artboardIndex];
+  pathBase = folder.fsName + '/' + prefix + artboard.name;
+  
+  for (i = 0; i < scales.length; i++) {
+    scale = scales[i];
+    path = pathBase;
+    
+    if (scale > 1) {
+      path += '@' + scale + 'x';
     }
     
-    var dialog = new Window('dialog', 'Backabit export options');
+    path += '.png';
+    file = new File(path);
+    options = new ExportOptionsPNG24();
     
-    var resolutionGroup = dialog.add('group');
-    var resolutionPanel = resolutionGroup.add('panel', undefined, 'Resolutions');
-    resolutionPanel.orientation = 'row';
-    
-    for (var i = 0; i < resolutions.length; i++) {
-        var cb = resolutionPanel.add('checkbox', undefined, '@' + resolutions[i] + 'x');
-        cb.item = resolutions[i];
-        checkboxes.push(cb);
-    }
-    
-    var exportGroup = dialog.add('group');
-    
-    var artboardLabel = exportGroup.add('statictext', undefined, 'Artboards');
-    
-    var artboardDefaultValue = '1';
-    
-    if (document.artboards.length > 1) {
-        artboardDefaultValue += '-' + document.artboards.length;
-    }
-    
-    var artboardField = exportGroup.add('edittext', undefined, artboardRange);
-    artboardField.characters = 10;
-    
-    artboardField.addEventListener('onChange', function () {
-       artboardRange = this.value; 
-    });
-    
-    var okButton = exportGroup.add('button', undefined, 'Export');
-    var cancelButton = exportGroup.add('button', undefined, 'Cancel');
-    
-    okButton.onClick = function () {
-       var artboardIndexes = rangeToArray(artboardRange);
-       var artboardIndex, artboard;
-       var checkboxIndex, checkbox, scale, scaleString, file, options;
-       
-       for (index = 0; index < artboardIndexes.length; index++) {
-           artboardIndex = artboardIndexes[index] - 1;
-           document.artboards.setActiveArtboardIndex(artboardIndex);
-           artboard = document.artboards[artboardIndex];
-           
-           for (checkboxIndex = 0; checkboxIndex < checkboxes.length; checkboxIndex++) {
-               checkbox = checkboxes[checkboxIndex];
-               
-               if (!checkbox.value) continue;
-               
-               scale = checkbox.item;
-               scaleString = (scale > 1) ? '@' + scale + 'x' : '';
-               
-               file = new File(folder.fsName + '/' + baseName + '_' + artboard.name + scaleString + '.png');
-               options = new ExportOptionsPNG24();
+    options.transparency = true;
+    options.artBoardClipping = true;
+    options.antiAliasing = true;
+    options.horizontalScale = scale / sourceScale * 100;
+    options.verticalScale = scale / sourceScale * 100;
 
-               options.transparency = true;
-               options.artBoardClipping = true;
-               options.antiAliasing = true;
-               options.horizontalScale = scale / designedAt * 100;
-               options.verticalScale = scale / designedAt * 100;
+    doc.exportFile(file, ExportType.PNG24, options);
+  }
+}
 
-               document.exportFile(file, ExportType.PNG24, options);
-           }
-       }
-       
-       dialog.close(); 
-    };
-    
-    cancelButton.onClick = function () {
-       dialog.close(); 
-    };
-    
-    dialog.show();
+/**
+ * UI
+ */
+
+function addSettingsField (parent, key, labelText) {
+  var group = parent.add('group');
+  var label = group.add('statictext', undefined, labelText);
+  var input = group.add('edittext', undefined, settings[key]);
+  label.characters = 7;
+  input.characters = 10;
+  input.onChange = function () {
+    settings[key] = this.text;
+  };
+}
+
+function createDialog () {
+  var dialog = new Window('dialog', 'Backabit Export');
+  
+  // Groups
+  var optionsGroup = dialog.add('group');
+  var folderGroup = dialog.add('group');
+  var actionsGroup = dialog.add('group');
+  
+  // Panels
+  var inPanel = optionsGroup.add('panel', undefined, 'In');
+  var outPanel = optionsGroup.add('panel', undefined, 'Out');
+  var folderPanel = folderGroup.add('panel', undefined, 'Folder');
+  folderPanel.orientation = 'row';
+  
+  // Add simple fields
+  addSettingsField(inPanel, 'sourceScale', 'Scale');
+  addSettingsField(inPanel, 'artboards', 'Artboards');
+  addSettingsField(outPanel, 'exportScales', 'Scales');
+  addSettingsField(outPanel, 'filePrefix', 'Prefix');
+  
+  // Folder
+  var folderPreview = folderPanel.add('statictext', undefined, settings.folder);
+  var folderButton = folderPanel.add('button', undefined, 'Change...');
+  folderPreview.characters = 30;
+  folderButton.onClick = function () {
+    var folder = Folder.selectDialog('Select destination folder');
+    if (folder) {
+      settings.folder = folder;
+      folderPreview.text = folder;
+    }
+  };
+  
+  // OK
+  var okButton = actionsGroup.add('button', undefined, 'Go!');
+  okButton.onClick = function () {
+    startExport();
+    dialog.close();
+  };
+  
+  // Cancel
+  var cancelButton = actionsGroup.add('button', undefined, 'Never mind');
+  cancelButton.onClick = function () {
+    dialog.close();
+  };
+  
+  dialog.show();
+}
+
+/**
+ * Initialization
+ */
+
+if (doc) {
+  createDialog();
 }
