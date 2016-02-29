@@ -8,7 +8,7 @@ http://backabit.com
 
 ### Backabit Ease Each
 
-![Backabit Export Screenshot](https://raw.githubusercontent.com/tylersticka/backabit-illustrator-scripts/master/screenshots/Backabit%20Ease%20Each.png.png)
+![Backabit Ease Each Screenshot](https://raw.githubusercontent.com/tylersticka/backabit-illustrator-scripts/master/screenshots/Backabit%20Ease%20Each.png)
 
 ### Backabit Export
 
